@@ -25,8 +25,8 @@ export class Login extends plugin {
             return;
         }
         //1. 调用二维码key接口获取key，/login/qr/key,返回qrcode，qrcode_img
-        const keyResponse = await sendRequest("/login/qr/key", "GET", { "Content-Type": "application/json" });
-        console.log(keyResponse)
+        const keyResponse = await sendRequest("/login/qr/key?timestrap=" + Date.now(), "GET", { "Content-Type": "application/json" });
+        // console.log(keyResponse)
         const key = keyResponse.data.qrcode;
         const qrcode_img = keyResponse.data.qrcode_img;
         const base64 = qrcode_img.includes(",") ? qrcode_img.split(",")[1] : qrcode_img;
@@ -38,31 +38,50 @@ export class Login extends plugin {
 
         //3. 轮询登录状态接口，/login/qr/check，必选参数：key: ,由第一个接口生成，
         // 轮询此接口可获取二维码扫码状态,0 为二维码过期，1 为等待扫码，2 为待确认，4 为授权登录成功（4 状态码下会返回 token）
+        let scannedNotified = false; // 避免重复提示扫码成功，等待确认
         const checkLoginStatus = async () => {
             try {
-                const checkResponse = await sendRequest("/login/qr/check?key=" + key, "GET", { "Content-Type": "application/json" });
-                const code = checkResponse.code;
-                if (code === 0) {
-                    e.reply("二维码已过期，请重新登录！");
-                    clearInterval(checkInterval);
-                } else if (code === 1) {
+                const timestrap = Date.now();
+                const checkResponse = await sendRequest("/login/qr/check?key=" + key + "&timestrap=" + timestrap, "GET", { "Content-Type": "application/json" });
+                // console.log(checkResponse)
+                const status = checkResponse.data.status;
+                if (status === 1) {
                     //等待扫码
-                } else if (code === 2) {
-                    e.reply("扫码成功，请确认登录！");
-                } else if (code === 4) {
-                    e.reply("登录成功！");
+                } else if (status === 2) {
+                    if (!scannedNotified) {
+                        e.reply("扫码成功，请确认登录！");
+                        scannedNotified = true;
+                    }
+                } else if (status === 4) {
                     clearInterval(checkInterval);
                     //在这里可以处理登录成功后的逻辑，例如保存 token 等
-                    const token = checkResponse.token;
-                    console.log("登录成功，token:", token);
+                    // console.log("登录成功，响应数据:", checkResponse);
+                    const token = checkResponse.data.token;
+                    // console.log("登录成功，token:", token);
+
+                    //保存用户信息到redis
+                    //1.构造key，格式为：Yz:kusign:userinfo:userid
+                    const redis_key = `Yz:kusign:userinfo:${e.user_id}`;
+                    //2.构造value
+                    const userInfo = checkResponse.data;
+                    //3.保存到redis
+                    await redis.set(redis_key, JSON.stringify(userInfo));
+                    e.reply("登录成功！");
                 } else {
-                    e.reply("登录状态未知，请查看日志！");
-                    logger.warn("未知登录状态:", checkResponse);
+                    e.reply("登录出错，请稍后再试！");
+                    logger.warn("登录出错，响应数据:", checkResponse);
                 }
             } catch (error) {
                 logger.error("检查登录状态失败:", error);
             }
         };
-        const checkInterval = setInterval(checkLoginStatus, 2000);
+        const checkInterval = setInterval(checkLoginStatus, 5000);
+
+        //4. 关闭API服务
+        try {
+            await stopApiService();
+        } catch (error) {
+            logger.error("关闭API服务失败:", error);
+        }
     }
 }

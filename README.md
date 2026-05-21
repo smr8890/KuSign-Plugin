@@ -1,0 +1,1 @@
+git clone --depth=1 --recurse-submodules --shallow-submodules https://github.com/smr8890/KuSign-Plugin.git ./plugins/KuSign-Plugin

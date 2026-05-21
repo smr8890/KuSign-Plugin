@@ -146,13 +146,15 @@ export class Sign extends plugin {
             }
 
             //构造回复消息
+            let replyMsg = `用户${userDetail.data.nickname}签到结果：` + (signResult.status === 1 ? "签到成功！" : "签到失败或已签到过！") + "\n";
+            replyMsg += `会员升级结果：` + (upgradeResult.status === 1 ? "升级成功！" : "升级失败或已是高级会员！") + "\n";
+            if (vipDetailResult.status === 1) {
+                replyMsg += `VIP到期时间：${vipDetailResult.data.busi_vip[0].vip_end_time}`;
+            }
             if (e?.user_id) {
-                let replyMsg = `用户${userDetail.data.nickname}签到结果：` + (signResult.status === 1 ? "签到成功！" : "签到失败或已签到过！") + "\n";
-                replyMsg += `会员升级结果：` + (upgradeResult.status === 1 ? "升级成功！" : "升级失败或已是高级会员！") + "\n";
-                if (vipDetailResult.status === 1) {
-                    replyMsg += `VIP到期时间：${vipDetailResult.data.busi_vip[0].vip_end_time}`;
-                }
                 e.reply(replyMsg);
+            } else {
+                Bot.pickUser(userId).sendMsg(replyMsg);
             }
 
             //延迟5秒，避免请求过快

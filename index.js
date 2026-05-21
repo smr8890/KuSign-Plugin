@@ -8,9 +8,9 @@ logger.info(chalk.yellow(`KuSign插件初始化~`));
 logger.info(chalk.magenta('-------------------------'));
 
 // 插件启动时自动拉起 api 服务
-startApiService().catch((error) => {
-    logger.error('启动 api 服务失败:', error);
-});
+// startApiService().catch((error) => {
+//     logger.error('启动 api 服务失败:', error);
+// });
 
 // 动态加载插件
 const files = fs

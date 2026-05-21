@@ -57,13 +57,14 @@ export class Login extends plugin {
                     //在这里可以处理登录成功后的逻辑，例如保存 token 等
                     // console.log("登录成功，响应数据:", checkResponse);
                     const token = checkResponse.data.token;
+                    const userid = checkResponse.data.userid;
                     // console.log("登录成功，token:", token);
 
                     //保存用户信息到redis
                     //1.构造key，格式为：Yz:kusign:userinfo:userid
                     const redis_key = `Yz:kusign:userinfo:${e.user_id}`;
                     //2.构造value
-                    const userInfo = checkResponse.data;
+                    const userInfo = { userid, token };
                     //3.保存到redis
                     await redis.set(redis_key, JSON.stringify(userInfo));
                     e.reply("登录成功！");
@@ -75,13 +76,6 @@ export class Login extends plugin {
                 logger.error("检查登录状态失败:", error);
             }
         };
-        const checkInterval = setInterval(checkLoginStatus, 5000);
-
-        //4. 关闭API服务
-        try {
-            await stopApiService();
-        } catch (error) {
-            logger.error("关闭API服务失败:", error);
-        }
+        const checkInterval = setInterval(checkLoginStatus, 2000);
     }
 }

@@ -1,5 +1,20 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import dotenv from 'dotenv';
 import { startService } from '../api/server.js';
 import { createRequest } from '../api/util/request.js';
+import { Config } from "../components/index.js";
+const api_address = Config.getcfg.api_address
+
+const apiEnvPath = fileURLToPath(new URL('../.env', import.meta.url));
+
+function loadApiEnv() {
+    if (fs.existsSync(apiEnvPath)) {
+        dotenv.config({ path: apiEnvPath, quiet: true });
+    }
+}
+
 
 let apiService = null;
 let apiServicePromise = null;
@@ -9,6 +24,8 @@ function getApiService() {
 }
 
 async function startApiService() {
+    loadApiEnv();
+
     if (apiService?.service) {
         return apiService;
     }
@@ -55,7 +72,9 @@ async function stopApiService() {
 }
 
 async function sendRequest(path, method, headers) {
-    const result = await fetch("http://127.0.0.1:3000" + path, {
+    loadApiEnv();
+
+    const result = await fetch(api_address + path, {
         method: method,
         headers: headers
     }).then(r => r.json())

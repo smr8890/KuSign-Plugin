@@ -1,2 +1,6 @@
 #api接口地址
-api_address: http://127.0.0.1:3000
+api_address: http://127.0.0.1:3009
+#api端口
+api_port: 3009
+#定时签到cron表达式
+sign_time: "0 31 4 * * ?"

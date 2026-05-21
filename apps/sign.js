@@ -38,34 +38,33 @@ export class Sign extends plugin {
         const userId = e.user_id;
         //1.检查用户是否已登录，检查redis中是否存在用户信息，key为：Yz:kusign:userinfo:userid
         const redis_key = `Yz:kusign:userinfo:${userId}`;
-        const userInfo = await redis.get(redis_key);
+        let userInfo = await redis.get(redis_key);
         if (!userInfo) {
             e.reply("您还未登录，请先登录！");
             return;
         }
 
-        //2.如果已登录，将用户id添加到签到任务中，定时执行签到任务，key为：Yz:kusign:sign_task_users，value为一个数组，包含所有需要执行签到任务的用户id
-        const signTaskUsers_key = "Yz:kusign:sign_task_users";
-        let signTaskUsers = await redis.get(signTaskUsers_key);
-        signTaskUsers = signTaskUsers ? JSON.parse(signTaskUsers) : [];
-        if (!signTaskUsers.includes(userId)) {
-            signTaskUsers.push(userId);
-            await redis.set(signTaskUsers_key, JSON.stringify(signTaskUsers));
-        }
+        //2.如果已登录，设置用户的自动签到状态为true，保存到redis中
+        userInfo = JSON.parse(userInfo);
+        userInfo.auto_sign = true;
+        await redis.set(redis_key, JSON.stringify(userInfo));
         e.reply("已开启酷狗概念版自动签到！");
     }
 
     async stopSign(e) {
         const userId = e.user_id;
-        //1.从签到任务中移除用户id
-        const signTaskUsers_key = "Yz:kusign:sign_task_users";
-        let signTaskUsers = await redis.get(signTaskUsers_key);
-        signTaskUsers = signTaskUsers ? JSON.parse(signTaskUsers) : [];
-        const index = signTaskUsers.indexOf(userId);
-        if (index > -1) {
-            signTaskUsers.splice(index, 1);
-            await redis.set(signTaskUsers_key, JSON.stringify(signTaskUsers));
+        //1.检查用户是否已登录，检查redis中是否存在用户信息，key为：Yz:kusign:userinfo:userid
+        const redis_key = `Yz:kusign:userinfo:${userId}`;
+        let userInfo = await redis.get(redis_key);
+        if (!userInfo) {
+            e.reply("您还未登录，请先登录！");
+            return;
         }
+
+        //2.如果已登录，设置用户的自动签到状态为false，保存到redis中
+        userInfo = JSON.parse(userInfo);
+        userInfo.auto_sign = false;
+        await redis.set(redis_key, JSON.stringify(userInfo));
         e.reply("已关闭酷狗概念版自动签到！");
     }
 
@@ -75,7 +74,7 @@ export class Sign extends plugin {
         if (e?.user_id) {
             userIds.push(e.user_id);
         } else {
-            const signTaskUsers_key = "Yz:kusign:sign_task_users";
+            const signTaskUsers_key = "Yz:kusign:users";
             let signTaskUsers = await redis.get(signTaskUsers_key);
             userIds = signTaskUsers ? JSON.parse(signTaskUsers) : [];
         }
@@ -99,6 +98,11 @@ export class Sign extends plugin {
                     logger.warn(`用户${userId}登录信息解析失败，跳过签到任务`);
                     continue;
                 }
+            }
+            //当auto_sign为false且非手动执行时，跳过签到任务
+            if (!e?.user_id && userInfo.auto_sign === false) {
+                // logger.info(`用户${userId}未开启自动签到，跳过签到任务`);
+                continue;
             }
             // console.log("签到任务，获取到的用户信息:", userInfo);
             if (!userInfo || !userInfo.token || !userInfo.userid) {

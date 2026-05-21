@@ -60,11 +60,21 @@ export class Login extends plugin {
                     const userid = checkResponse.data.userid;
                     // console.log("登录成功，token:", token);
 
-                    //保存用户信息到redis
+                    //保存e.user_id到redis，key为：Yz:kusign:users，value为一个数组，包含所有登录过的用户id
+                    const user_key = "Yz:kusign:users";
+                    let users = await redis.get(user_key);
+                    users = users ? JSON.parse(users) : [];
+                    if (!users.includes(e.user_id)) {
+                        users.push(e.user_id);
+                        await redis.set(user_key, JSON.stringify(users));
+                    }
+
+                    //保存用户信息到redis，key为：Yz:kusign:userinfo:userid，value为一个对象，包含用户的token和userid，例如：
+                    // { token: xxx, userid: xxx ,token_time: xxx,auto_sign: true/false}，
                     //1.构造key，格式为：Yz:kusign:userinfo:userid
                     const redis_key = `Yz:kusign:userinfo:${e.user_id}`;
                     //2.构造value
-                    const userInfo = { userid, token };
+                    const userInfo = { userid: userid, token: token, token_time: Date.now(), auto_sign: false };
                     //3.保存到redis
                     await redis.set(redis_key, JSON.stringify(userInfo));
                     e.reply("登录成功！");

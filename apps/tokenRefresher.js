@@ -9,7 +9,7 @@ export class TokenRefresher extends plugin {
             priority: 10,
             rule: [
                 {
-                    reg: "^#?刷新Token$",
+                    reg: "^#?酷狗刷新token$",
                     fnc: "refreshToken",
                     log: true,
                 }

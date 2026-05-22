@@ -20,7 +20,7 @@ export class Login extends plugin {
         try {
             await startApiService();
         } catch (error) {
-            e.reply("启动API服务失败，请查看日志！");
+            e.reply("启动API服务失败");
             logger.error("启动API服务失败:", error);
             return;
         }
@@ -39,28 +39,32 @@ export class Login extends plugin {
         //3. 轮询登录状态接口，/login/qr/check，必选参数：key: ,由第一个接口生成，
         // 轮询此接口可获取二维码扫码状态,0 为二维码过期，1 为等待扫码，2 为待确认，4 为授权登录成功（4 状态码下会返回 token）
         let scannedNotified = false; // 避免重复提示扫码成功，等待确认
-        const checkLoginStatus = async () => {
+        let loginSuccess = false;
+        const intervalMs = 2000; // 轮询间隔 2s
+        const timeoutMs = 2 * 60 * 1000; // 2 分钟超时
+        const maxAttempts = Math.ceil(timeoutMs / intervalMs);
+        for (let attempt = 0; attempt < maxAttempts && !loginSuccess; attempt++) {
             try {
                 const timestrap = Date.now();
                 const checkResponse = await sendRequest("/login/qr/check?key=" + key + "&timestrap=" + timestrap, "GET", { "Content-Type": "application/json" });
-                // console.log(checkResponse)
                 const status = checkResponse.data.status;
                 if (status === 1) {
-                    //等待扫码
+                    // 等待扫码
+                } else if (status === 0) {
+                    // 二维码已过期
+                    e.reply("二维码已过期，请重新登录。");
+                    logger.info("二维码已过期，key:", key);
+                    loginSuccess = true;
                 } else if (status === 2) {
                     if (!scannedNotified) {
                         e.reply("扫码成功，请确认登录！");
                         scannedNotified = true;
                     }
                 } else if (status === 4) {
-                    clearInterval(checkInterval);
-                    //在这里可以处理登录成功后的逻辑，例如保存 token 等
-                    // console.log("登录成功，响应数据:", checkResponse);
+                    // 登录成功，保存信息
                     const token = checkResponse.data.token;
                     const userid = checkResponse.data.userid;
-                    // console.log("登录成功，token:", token);
 
-                    //保存e.user_id到redis，key为：Yz:kusign:users，value为一个数组，包含所有登录过的用户id
                     const user_key = "Yz:kusign:users";
                     let users = await redis.get(user_key);
                     users = users ? JSON.parse(users) : [];
@@ -69,23 +73,40 @@ export class Login extends plugin {
                         await redis.set(user_key, JSON.stringify(users));
                     }
 
-                    //保存用户信息到redis，key为：Yz:kusign:userinfo:userid，value为一个对象，包含用户的token和userid，例如：
-                    // { token: xxx, userid: xxx ,token_time: xxx,auto_sign: true/false}，
-                    //1.构造key，格式为：Yz:kusign:userinfo:userid
                     const redis_key = `Yz:kusign:userinfo:${e.user_id}`;
-                    //2.构造value
-                    const userInfo = { userid: userid, token: token, token_time: Date.now(), auto_sign: false };
-                    //3.保存到redis
+                    let existingInfoRaw = await redis.get(redis_key);
+                    let existingInfo = existingInfoRaw ? JSON.parse(existingInfoRaw) : null;
+                    const auto_sign = (existingInfo && typeof existingInfo.auto_sign !== 'undefined') ? existingInfo.auto_sign : false;
+                    const userInfo = { userid: userid, token: token, token_time: Date.now(), auto_sign: auto_sign };
                     await redis.set(redis_key, JSON.stringify(userInfo));
                     e.reply("登录成功！");
+                    loginSuccess = true;
                 } else {
                     e.reply("登录出错，请稍后再试！");
                     logger.warn("登录出错，响应数据:", checkResponse);
+                    loginSuccess = true;
                 }
             } catch (error) {
                 logger.error("检查登录状态失败:", error);
+                loginSuccess = true;
             }
-        };
-        const checkInterval = setInterval(checkLoginStatus, 2000);
+
+            if (!loginSuccess && attempt < maxAttempts - 1) {
+                await new Promise(resolve => setTimeout(resolve, intervalMs));
+            }
+        }
+
+        if (!loginSuccess) {
+            e.reply("登录超时，请重试。");
+            logger.info("二维码登录超时，key:", key);
+        }
+
+        //停止API服务
+        try {
+            await stopApiService();
+        } catch (error) {
+            e.reply("停止API服务失败");
+            logger.error("停止API服务失败:", error);
+        }
     }
 }

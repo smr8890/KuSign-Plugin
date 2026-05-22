@@ -120,34 +120,26 @@ export class Sign extends plugin {
             }
 
             //领取每日畅听会员
-            const receiveDay = new Date().toISOString().slice(0, 10); // 格式为 YYYY-MM-DD，如 2026-01-30
+            const receiveDay = new Date(new Date().getTime() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10); // 北京时间 YYYY-MM-DD
             // console.log(`签到任务，领取每日畅听会员，使用的日期参数:`, receiveDay);
             const signResult = await sendRequest(`/youth/day/vip?receive_day=${receiveDay}`, "GET", headers);
             if (signResult.status === 1) {
                 logger.info(`用户${userDetail.data.nickname}签到成功:`);
             }
-            // if (e?.user_id) {
-            //     e.reply(`用户${userDetail.data.nickname}签到结果：` + (signResult.status === 1 ? "签到成功！" : "签到失败或已签到过！"));
-            // }
 
             //尝试升级会员
             const upgradeResult = await sendRequest(`/youth/day/vip/upgrade`, "GET", headers);
             if (upgradeResult.status === 1) {
                 logger.info(`用户${userDetail.data.nickname}会员升级成功:`);
             }
-            // if (e?.user_id) {
-            //     e.reply(`用户${userDetail.data.nickname}会员升级结果：` + (upgradeResult.status === 1 ? "升级成功！" : "升级失败或已是高级会员！"));
-            // }
 
             //输出会员信息
             const vipDetailResult = await sendRequest(`/user/vip/detail`, "GET", headers);
-            if (vipDetailResult.status === 1) {
-                logger.info(`VIP到期时间：${vipDetailResult.data.busi_vip[0].vip_end_time}`);
-            }
 
             //构造回复消息
-            let replyMsg = `用户${userDetail.data.nickname}签到结果：` + (signResult.status === 1 ? "签到成功！" : "签到失败或已签到过！") + "\n";
-            replyMsg += `会员升级结果：` + (upgradeResult.status === 1 ? "升级成功！" : "升级失败或已是高级会员！") + "\n";
+            let replyMsg = "KuSign签到结果：\n";
+            replyMsg += "畅听VIP：" + (signResult.status === 1 ? "签到成功" : "签到失败或已签到！") + "\n";
+            replyMsg += "概念VIP：" + (upgradeResult.status === 1 ? "升级成功" : "升级失败或已升级！") + "\n";
             if (vipDetailResult.status === 1) {
                 replyMsg += `VIP到期时间：${vipDetailResult.data.busi_vip[0].vip_end_time}`;
             }

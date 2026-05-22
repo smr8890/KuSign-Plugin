@@ -124,13 +124,13 @@ export class Sign extends plugin {
             // console.log(`签到任务，领取每日畅听会员，使用的日期参数:`, receiveDay);
             const signResult = await sendRequest(`/youth/day/vip?receive_day=${receiveDay}`, "GET", headers);
             if (signResult.status === 1) {
-                logger.info(`用户${userDetail.data.nickname}签到成功:`);
+                logger.info(`用户${userDetail.data.nickname}签到成功`);
             }
 
             //尝试升级会员
             const upgradeResult = await sendRequest(`/youth/day/vip/upgrade`, "GET", headers);
             if (upgradeResult.status === 1) {
-                logger.info(`用户${userDetail.data.nickname}会员升级成功:`);
+                logger.info(`用户${userDetail.data.nickname}会员升级成功`);
             }
 
             //输出会员信息
